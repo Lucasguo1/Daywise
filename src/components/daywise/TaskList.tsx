@@ -20,6 +20,7 @@ const iconMap: { [key: string]: React.ReactNode } = {
 };
 
 export function TaskList({ title, tasks, onToggleComplete, onDeleteTask, emptyStateMessage = "No tasks here yet!" }: TaskListProps) {
+  console.log(`TaskList Component Render: Title='${title}', Number of tasks received=${tasks.length}`, tasks); // Added this line
   const displayIcon = iconMap[title] || <ListTodo className="h-6 w-6 text-primary" />;
   
   return (

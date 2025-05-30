@@ -30,7 +30,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, PlusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import type { Priority, Task } from "@/lib/types";
+// Removed: import type { Priority, Task } from "@/lib/types"; - Task type no longer directly used for onAddTask
+import { submitTaskToApi } from "@/lib/actions";
+import { useToast } from "@/hooks/use-toast"; // Added for error feedback
 
 const taskFormSchema = z.object({
   name: z.string().min(1, "Task name is required"),
@@ -42,11 +44,13 @@ const taskFormSchema = z.object({
 
 type TaskFormValues = z.infer<typeof taskFormSchema>;
 
+// Updated TaskFormProps interface
 interface TaskFormProps {
-  onAddTask: (task: Omit<Task, 'id' | 'completed'>) => void;
+  onApiTaskAdded: () => void; // Signal successful API submission to parent
 }
 
-export function TaskForm({ onAddTask }: TaskFormProps) {
+export function TaskForm({ onApiTaskAdded }: TaskFormProps) {
+  const { toast } = useToast(); // Initialize toast
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
     defaultValues: {
@@ -57,15 +61,63 @@ export function TaskForm({ onAddTask }: TaskFormProps) {
     },
   });
 
-  function onSubmit(values: TaskFormValues) {
-    onAddTask(values);
-    form.reset();
+  async function onSubmit(values: TaskFormValues) {
+    let deviceId = localStorage.getItem('userDeviceId');
+    if (!deviceId) {
+      deviceId = crypto.randomUUID();
+      localStorage.setItem('userDeviceId', deviceId);
+    }
+
+    const priorityMap = {
+      low: "Low",
+      medium: "Medium",
+      high: "High",
+    };
+
+    const apiTaskData = {
+      option: "insert" as const,
+      task_name: values.name,
+      description: values.description,
+      due_date: values.dueDate ? format(values.dueDate, "yyyy-MM-dd") : "",
+      priority: priorityMap[values.priority] as "Low" | "Medium" | "High",
+      estimated_hours: parseFloat(values.estimatedCompletionTime),
+      device: deviceId,
+    };
+
+    try {
+      const result = await submitTaskToApi(apiTaskData);
+
+      if (result.success) {
+        toast({
+          title: "Task Submitted to API",
+          description: `"${apiTaskData.task_name}" sent to server.`,
+        });
+        onApiTaskAdded(); // Notify parent to refresh API task list
+        form.reset();
+      } else {
+        console.error("Failed to submit task to API:", result.error);
+        toast({
+          title: "API Submission Error",
+          description: result.error || "Could not submit task to the server.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("An unexpected error occurred while submitting the task:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
+      toast({
+        title: "Submission Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
   }
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 p-6 border rounded-lg shadow-lg bg-card">
         <h2 className="text-2xl font-semibold text-primary mb-4">Create New Task</h2>
+        {/* FormFields remain the same */}
         <FormField
           control={form.control}
           name="name"
@@ -169,7 +221,7 @@ export function TaskForm({ onAddTask }: TaskFormProps) {
         </div>
         <Button type="submit" className="w-full sm:w-auto">
           <PlusCircle className="mr-2 h-5 w-5" />
-          Add Task
+          Add Task to API
         </Button>
       </form>
     </Form>
