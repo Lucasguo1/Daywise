@@ -144,7 +144,7 @@ export default function DayWisePage() {
           {isLoadingTasks && <p>Loading tasks from server...</p>}
           {tasksError && <p className="text-red-500">Error loading tasks: {tasksError}</p>}
           {!isLoadingTasks && !tasksError && tasks.length === 0 && (
-            <p>No tasks found for this device. Add one above or check device ID!</p>
+            <p>No tasks.</p>
           )}
         </section>
 
